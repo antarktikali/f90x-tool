@@ -1,0 +1,21 @@
+[package]
+name = "f90x-tool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# For the actual serial communcation with the camera
+serialport = { version = "4.0.0" }
+
+# For better error handling
+anyhow = { version = "1.0.0" }
+
+# For parsing CLI arguments
+clap = { version = "4.0.0", features = ["derive"] }
+# For parsing hex formatted CLI arguments
+clap-num = { version = "1.0.0" }
+
+# For easy debug loggs
+env_logger = { version = "0.11.0" }
+log = { version = "0.4.0" }
+
