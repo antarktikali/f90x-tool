@@ -28,31 +28,54 @@ impl CameraCommand {
     }
 }
 
-pub fn parse_data_packet(bytes: &Vec<u8>, expected_payload_length: u8) -> Result<Vec<u8>, anyhow::Error> {
-    if bytes.is_empty() {
-        return Err(anyhow!["Received empty packet."]);
-    }
-    if bytes.len() != (expected_payload_length as usize) + 3 {
-        return Err(anyhow!["Received incorrect number of bytes."]);
-    }
-    if bytes[0] != 0x02u8 {
-        return Err(anyhow!["Data packet header is wrong."]);
-    }
-    if bytes[bytes.len() - 1] != 0x03u8 {
-        return Err(anyhow!["Data packet end is wrong."]);
+pub struct DataPacket {
+    pub bytes: Vec<u8>
+}
+
+impl DataPacket {
+    fn serialize(&self) -> Vec<u8> {
+        let mut serialized: Vec<u8> = Vec::new();
+
+        serialized.push(0x02); // "start" byte
+        serialized.extend(&self.bytes);
+        serialized.push(DataPacket::calculate_checksum(&self.bytes));
+        serialized.push(0x03); // "end" byte
+
+        return serialized;
     }
 
-    let checksum_index: usize = bytes.len() - 2;
-    let mut expected_checksum: u64 = 0;
-    let payload_bytes: &[u8] = &bytes[1 .. checksum_index];
-    for byte in payload_bytes {
-        expected_checksum += *byte as u64;
-    }
-    if bytes[checksum_index] as u64 != (expected_checksum % 0xFF) {
-        return Err(anyhow!["Received wrong checksum."]);
+    pub fn deserialize(data: &Vec<u8>) -> Result<DataPacket> {
+        if data.len() < 4 {
+            return Err(anyhow!["Data packet has incorrect number of bytes."]);
+        }
+        if data[0] != 0x02u8 {
+            return Err(anyhow!["Data packet header is wrong."]);
+        }
+        if data[data.len() - 1] != 0x03u8 {
+            return Err(anyhow!["Data packet end is wrong."]);
+        }
+
+        let checksum_index: usize = data.len() - 2;
+        let payload_bytes: &[u8] = &data[1 .. checksum_index];
+
+        let expected_checksum = DataPacket::calculate_checksum(payload_bytes);
+        if expected_checksum != data[checksum_index] {
+            return Err(anyhow!["Received wrong checksum."]);
+        }
+
+        return Ok(DataPacket {
+            bytes: payload_bytes.to_vec()
+        });
     }
 
-    return Ok(payload_bytes.to_vec());
+    fn calculate_checksum(data: &[u8]) -> u8 {
+        let mut checksum: u16 = 0;
+        for &byte in data {
+            checksum += byte as u16;
+            checksum %= 0xFF;
+        }
+        return (checksum % 0xFF) as u8;
+    }
 }
 
 #[cfg(test)]
@@ -95,62 +118,59 @@ mod tests {
     }
 
     #[test]
-    fn empty_data_packet_should_be_error() {
-        let packet: Vec<u8> = Vec::new();
-        assert!(parse_data_packet(&packet, 0).is_err());
-    }
-
-    #[test]
-    fn data_packet_with_shorter_length_should_be_error() {
-        let packet: Vec<u8> = vec![0x02, 0x00, 0x00, 0x03];
-        assert!(parse_data_packet(&packet, 2).is_err());
-    }
-
-    #[test]
-    fn data_packet_with_longer_length_should_be_error() {
-        let packet: Vec<u8> = vec![0x02, 0x00, 0x00, 0x03, 0x01, 0x04, 0x03];
-        assert!(parse_data_packet(&packet, 1).is_err());
+    fn too_short_data_packet_should_be_error() {
+        let packet: Vec<u8> = vec![0x02, 0x00, 0x03];
+        assert!(DataPacket::deserialize(&packet).is_err());
     }
 
     #[test]
     fn data_packet_with_wrong_checksum_should_be_error() {
         let packet: Vec<u8> = vec![0x02, 0x04, 0x03, 0x06, 0x03];
-        assert!(parse_data_packet(&packet, 2).is_err());
+        assert!(DataPacket::deserialize(&packet).is_err());
     }
 
     #[test]
     fn data_packet_with_wrong_start_should_be_error() {
         let packet: Vec<u8> = vec![0x01, 0x04, 0x03, 0x07, 0x03];
-        assert!(parse_data_packet(&packet, 2).is_err());
+        assert!(DataPacket::deserialize(&packet).is_err());
     }
 
     #[test]
     fn data_packet_with_wrong_end_should_be_error() {
         let packet: Vec<u8> = vec![0x02, 0x04, 0x03, 0x07, 0x04];
-        assert!(parse_data_packet(&packet, 2).is_err());
+        assert!(DataPacket::deserialize(&packet).is_err());
     }
 
     #[test]
-    fn data_packet_should_be_parsed_correctly() {
+    fn data_packet_should_be_deserialized_correctly() {
         let expected_payload: Vec<u8> = vec![0x04, 0x03];
         let packet: Vec<u8> = vec![0x02, 0x04, 0x03, 0x07, 0x03];
-        let result = parse_data_packet(&packet, 2);
+        let result = DataPacket::deserialize(&packet);
         match result {
-            Ok(payload) => { assert_eq!(&expected_payload, &payload); },
+            Ok(deserialized) => { assert_eq!(&expected_payload, &deserialized.bytes); },
             Err(_) => assert!(false),
         }
     }
 
     #[test]
-    fn data_packet_with_large_checksum_should_be_parsed_correctly() {
+    fn data_packet_with_large_checksum_should_be_deserialized_correctly() {
         let expected_payload: Vec<u8> = vec![0xFA, 0x0A, 0x04];
         // 250 + 10 + 4: 264 -> 9
         let packet: Vec<u8> = vec![0x02, 0xFA, 0x0A, 0x04, 0x09, 0x03];
-        let result = parse_data_packet(&packet, 3);
+        let result = DataPacket::deserialize(&packet);
         match result {
-            Ok(payload) => { assert_eq!(&expected_payload, &payload); },
+            Ok(deserialized) => { assert_eq!(&expected_payload, &deserialized.bytes); },
             Err(_) => assert!(false),
         }
+    }
+
+    #[test]
+    fn data_packet_should_be_serialized_correctly() {
+        let packet = DataPacket {
+            bytes: vec![0x04, 0x03]
+        };
+        let expected: Vec<u8> = vec![0x02, 0x04, 0x03, 0x07, 0x03];
+        assert_eq!(expected, packet.serialize());
     }
 }
 

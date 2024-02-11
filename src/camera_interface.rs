@@ -103,7 +103,8 @@ fn read_memory<T: std::io::Write + std::io::Read>(
     serial.read_exact(&mut read_buffer)?;
     debug!("Received response: {:02X?}", read_buffer);
 
-    return messaging::parse_data_packet(&read_buffer, length);
+    let data_packet = messaging::DataPacket::deserialize(&read_buffer)?;
+    return Ok(data_packet.bytes);
 }
 
 fn validate_unit_response(response: &[u8; 16]) -> Result<()> {
