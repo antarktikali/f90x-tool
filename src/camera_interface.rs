@@ -23,6 +23,23 @@ pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: 
     return Ok(());
 }
 
+pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
+    let default_baud_rate = 1200;
+    let default_serial_timeout = 2000;
+
+    let mut serial = serialport::new(serial_device, default_baud_rate)
+            .timeout(Duration::from_millis(default_serial_timeout))
+            .open()
+            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device))?;
+
+    send_wakeup_command(&mut serial)?;
+    do_unit_inquiry(&mut serial)?;
+    send_focus_command(&mut serial)?;
+    expect_ok_response(&mut serial)?;
+
+    return Ok(());
+}
+
 fn send_wakeup_command(serial: &mut Box<dyn serialport::SerialPort>) -> Result<()> {
     // Send "wakeup"
     let cmd = CameraCommand::Wakeup.get_bytes();
@@ -91,6 +108,24 @@ fn validate_unit_response(response: &[u8; 16]) -> Result<()> {
     }
 }
 
+fn send_focus_command<T: std::io::Write>(serial: &mut T) -> Result<()> {
+    let cmd = CameraCommand::Focus.get_bytes();
+    debug!("Sending focus command: {:02X?}", cmd);
+    serial.write(&cmd)?;
+
+    return Ok(());
+}
+
+fn expect_ok_response<T: std::io::Read>(serial: &mut T) -> Result<()> {
+    let mut read_buffer: [u8; 2] = [0; 2];
+    serial.read_exact(&mut read_buffer)?;
+    debug!("Received response: {:02X?}", read_buffer);
+    if read_buffer != messaging::OK_RESPONSE {
+        return Err(anyhow!("Received unexpected response."));
+    }
+    return Ok(());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,6 +140,31 @@ mod tests {
     fn correct_unit_inquiry_response_should_be_validated() {
         let correct_response: [u8; 16] = [0x31, 0x30, 0x32, 0x30, 0x46, 0x39, 0x30, 0x58, 0x2F, 0x4E, 0x39, 0x30, 0x53, 0x00, 0x03, 0x06];
         assert!(validate_unit_response(&correct_response).is_ok());
+    }
+
+    #[test]
+    fn correct_focus_command_should_be_sent() {
+        let mut buf: Vec<u8> = Vec::new();
+        assert!(send_focus_command(&mut buf).is_ok());
+        assert_eq!(CameraCommand::Focus.get_bytes(), buf);
+    }
+
+    #[test]
+    fn too_short_response_should_fail() {
+        let buf: [u8; 1] = [0x06];
+        assert!(expect_ok_response(&mut &buf[..]).is_err());
+    }
+
+    #[test]
+    fn wrong_response_should_fail() {
+        let buf: [u8; 2] = [0x06, 0x01];
+        assert!(expect_ok_response(&mut &buf[..]).is_err());
+    }
+
+    #[test]
+    fn correct_response_should_be_ok() {
+        let buf: [u8; 2] = [0x06, 0x00];
+        assert!(expect_ok_response(&mut &buf[..]).is_ok());
     }
 }
 

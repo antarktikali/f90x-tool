@@ -38,8 +38,11 @@ enum Commands {
         #[clap(value_parser=clap_num::maybe_hex::<u8>)]
         write_values: Vec<u8>,
     },
-    /// [NOT IMPLEMENTED] Triggers auto-focus.
-    Focus,
+    /// Triggers auto-focus.
+    Focus {
+        /// Serial device to use.
+        serial_device: String,
+    },
     /// [NOT IMPLEMENTED] Releases the shutter.
     Shoot
 }
@@ -55,7 +58,7 @@ fn main() -> Result<()> {
         Commands::Write { serial_device: _, address: _, write_values: _ } => {
             todo!();
         },
-        Commands::Focus => todo!(),
+        Commands::Focus { serial_device } => camera_interface::autofocus_in_new_session(&serial_device)?,
         Commands::Shoot => todo!()
     };
 
