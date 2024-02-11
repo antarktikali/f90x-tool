@@ -12,7 +12,7 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Commands {
-    // Reads given memory address
+    /// Reads given memory address
     Read {
         /// Serial device to use.
         serial_device: String,
