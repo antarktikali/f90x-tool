@@ -43,8 +43,11 @@ enum Commands {
         /// Serial device to use.
         serial_device: String,
     },
-    /// [NOT IMPLEMENTED] Releases the shutter.
-    Shoot
+    /// Releases the shutter.
+    Shoot {
+        /// Serial device to use.
+        serial_device: String,
+    }
 }
 
 fn main() -> Result<()> {
@@ -59,7 +62,7 @@ fn main() -> Result<()> {
             todo!();
         },
         Commands::Focus { serial_device } => camera_interface::autofocus_in_new_session(&serial_device)?,
-        Commands::Shoot => todo!()
+        Commands::Shoot { serial_device } => camera_interface::release_shutter_in_new_session(&serial_device)?,
     };
 
     return Ok(());

@@ -6,6 +6,7 @@ pub enum CameraCommand {
     Wakeup,
     UnitInquiry,
     Focus,
+    Shoot,
     ReadMemory {
         memory_space: u8,
         address: u16,
@@ -19,6 +20,7 @@ impl CameraCommand {
             CameraCommand::Wakeup => vec![0x00],
             CameraCommand::UnitInquiry => vec![0x53, 0x31, 0x30, 0x30, 0x30, 0x05],
             CameraCommand::Focus => vec![0x01, 0x20, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
+            CameraCommand::Shoot => vec![0x01, 0x20, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::ReadMemory { memory_space, address, length } => {
                 vec![0x01, 0x20, 0x80, *memory_space, ((address >> 8) as u8), (*address as u8), 0x00, *length, 0x03]
             }
@@ -79,9 +81,16 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_focus_command() {
+    fn test_camera_focus_command() {
         let cmd = CameraCommand::Focus;
         let expected: Vec<u8> = vec![0x01, 0x20, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03];
+        assert_eq!(expected, cmd.get_bytes());
+    }
+
+    #[test]
+    fn test_camera_shoot_command() {
+        let cmd = CameraCommand::Shoot;
+        let expected: Vec<u8> = vec![0x01, 0x20, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03];
         assert_eq!(expected, cmd.get_bytes());
     }
 

@@ -40,6 +40,23 @@ pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
     return Ok(());
 }
 
+pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
+    let default_baud_rate = 1200;
+    let default_serial_timeout = 2000;
+
+    let mut serial = serialport::new(serial_device, default_baud_rate)
+            .timeout(Duration::from_millis(default_serial_timeout))
+            .open()
+            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device))?;
+
+    send_wakeup_command(&mut serial)?;
+    do_unit_inquiry(&mut serial)?;
+    send_shoot_command(&mut serial)?;
+    expect_ok_response(&mut serial)?;
+
+    return Ok(());
+}
+
 fn send_wakeup_command(serial: &mut Box<dyn serialport::SerialPort>) -> Result<()> {
     // Send "wakeup"
     let cmd = CameraCommand::Wakeup.get_bytes();
@@ -116,6 +133,14 @@ fn send_focus_command<T: std::io::Write>(serial: &mut T) -> Result<()> {
     return Ok(());
 }
 
+fn send_shoot_command<T: std::io::Write>(serial: &mut T) -> Result<()> {
+    let cmd = CameraCommand::Shoot.get_bytes();
+    debug!("Sending shutter release command: {:02X?}", cmd);
+    serial.write(&cmd)?;
+
+    return Ok(());
+}
+
 fn expect_ok_response<T: std::io::Read>(serial: &mut T) -> Result<()> {
     let mut read_buffer: [u8; 2] = [0; 2];
     serial.read_exact(&mut read_buffer)?;
@@ -147,6 +172,13 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         assert!(send_focus_command(&mut buf).is_ok());
         assert_eq!(CameraCommand::Focus.get_bytes(), buf);
+    }
+
+    #[test]
+    fn correct_shoot_command_should_be_sent() {
+        let mut buf: Vec<u8> = Vec::new();
+        assert!(send_shoot_command(&mut buf).is_ok());
+        assert_eq!(CameraCommand::Shoot.get_bytes(), buf);
     }
 
     #[test]
