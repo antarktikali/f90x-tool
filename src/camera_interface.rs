@@ -7,16 +7,8 @@ use std::thread;
 use std::time::Duration;
 
 pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: u8, memory_space: u8) -> Result<()> {
-    let default_baud_rate = 1200;
-    let default_serial_timeout = 2000;
-
-    let mut serial = serialport::new(serial_device, default_baud_rate)
-            .timeout(Duration::from_millis(default_serial_timeout))
-            .open()
-            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device))?;
-
-    send_wakeup_command(&mut serial)?;
-    do_unit_inquiry(&mut serial)?;
+    let mut serial = initialize_serial(&serial_device)?;
+    start_new_session(&mut serial)?;
     let payload = read_memory(&mut serial, address, length, memory_space)?;
     println!("Memory value: {:02X?}", payload);
 
@@ -24,16 +16,8 @@ pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: 
 }
 
 pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
-    let default_baud_rate = 1200;
-    let default_serial_timeout = 2000;
-
-    let mut serial = serialport::new(serial_device, default_baud_rate)
-            .timeout(Duration::from_millis(default_serial_timeout))
-            .open()
-            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device))?;
-
-    send_wakeup_command(&mut serial)?;
-    do_unit_inquiry(&mut serial)?;
+    let mut serial = initialize_serial(&serial_device)?;
+    start_new_session(&mut serial)?;
     send_focus_command(&mut serial)?;
     expect_ok_response(&mut serial)?;
 
@@ -41,20 +25,27 @@ pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
 }
 
 pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
-    let default_baud_rate = 1200;
-    let default_serial_timeout = 2000;
-
-    let mut serial = serialport::new(serial_device, default_baud_rate)
-            .timeout(Duration::from_millis(default_serial_timeout))
-            .open()
-            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device))?;
-
-    send_wakeup_command(&mut serial)?;
-    do_unit_inquiry(&mut serial)?;
+    let mut serial = initialize_serial(&serial_device)?;
+    start_new_session(&mut serial)?;
     send_shoot_command(&mut serial)?;
     expect_ok_response(&mut serial)?;
 
     return Ok(());
+}
+
+fn initialize_serial(serial_device: &String) -> Result<Box<dyn serialport::SerialPort>> {
+    let default_baud_rate = 1200;
+    let default_serial_timeout = 2000;
+
+    return serialport::new(serial_device, default_baud_rate)
+            .timeout(Duration::from_millis(default_serial_timeout))
+            .open()
+            .with_context(|| format!("Could not open the serial device \"{}\"", &serial_device));
+}
+
+fn start_new_session(serial: &mut Box<dyn serialport::SerialPort>) -> Result<()> {
+    send_wakeup_command(serial)?;
+    return do_unit_inquiry(serial);
 }
 
 fn send_wakeup_command(serial: &mut Box<dyn serialport::SerialPort>) -> Result<()> {
