@@ -12,6 +12,10 @@ pub enum CameraCommand {
         address: u16,
         length: u8,
     },
+    WriteToMemory {
+        address: u16,
+        values: Vec<u8>,
+    },
 }
 
 impl CameraCommand {
@@ -22,9 +26,39 @@ impl CameraCommand {
             CameraCommand::Focus => vec![0x01, 0x20, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::Shoot => vec![0x01, 0x20, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::ReadMemory { memory_space, address, length } => {
-                vec![0x01, 0x20, 0x80, *memory_space, ((address >> 8) as u8), (*address as u8), 0x00, *length, 0x03]
-            }
+                CameraCommand::build_read_memory_command(*memory_space, *address, *length)
+            },
+            CameraCommand::WriteToMemory { address, values } => {
+                CameraCommand::build_write_to_memory_command(*address, &values)
+            },
         }
+    }
+
+    fn build_read_memory_command(memory_space: u8, address: u16, length: u8) -> Vec<u8> {
+        vec![0x01, 0x20, 0x80,
+             memory_space,
+             ((address >> 8) as u8), (address as u8),
+             0x00,
+             length,
+             0x03
+        ]
+    }
+
+    fn build_write_to_memory_command(address: u16, values: &Vec<u8>) -> Vec<u8> {
+        if values.len() > (u8::MAX as usize) {
+            return Vec::new();
+        }
+        let data_packet = DataPacket { bytes: values.clone() };
+        let mut data_packet = data_packet.serialize();
+        let mut write_packet = vec![
+                0x01, 0x20, 0x81,
+                0x00,
+                ((address >> 8) as u8), (address as u8),
+                0x00,
+                values.len() as u8,
+        ];
+        write_packet.append(&mut data_packet);
+        return write_packet;
     }
 }
 
@@ -87,6 +121,46 @@ mod tests {
         let cmd = CameraCommand::ReadMemory { memory_space: 0xA1, address: 0xB2C3, length: 0xD4 };
         let expected: Vec<u8> = vec![0x01, 0x20, 0x80, 0xA1, 0xB2, 0xC3, 0x00, 0xD4, 0x03];
         assert_eq!(expected, cmd.get_bytes());
+    }
+
+    #[test]
+    fn test_write_memory_command() {
+        let cmd = CameraCommand::WriteToMemory { address: 0xAABB, values: vec![0x0C, 0x0D, 0x0E] };
+        let expected: Vec<u8> = vec![
+            0x01, 0x20, 0x81,
+            0x00,
+            0xAA, 0xBB,
+            0x00,
+            0x03, // length
+            0x02, // "start"
+            0x0C, 0x0D, 0x0E, // payload
+            0x27, // checksum
+            0x03 // "stop"
+        ];
+        assert_eq!(expected, cmd.get_bytes());
+    }
+
+    #[test]
+    fn test_write_memory_command_with_large_checksum() {
+        let cmd = CameraCommand::WriteToMemory { address: 0x1122, values: vec![0xFA, 0x10] };
+        let expected: Vec<u8> = vec![
+            0x01, 0x20, 0x81,
+            0x00,
+            0x11, 0x22,
+            0x00,
+            0x02, // length
+            0x02, // "start"
+            0xFA, 0x10, // payload
+            0x0B, // checksum
+            0x03 // "stop"
+        ];
+        assert_eq!(expected, cmd.get_bytes());
+    }
+
+    #[test]
+    fn write_memory_with_too_many_values_should_return_empty_bytes() {
+        let cmd = CameraCommand::WriteToMemory { address: 0xAABB, values: vec![0x00; 256] };
+        assert!(cmd.get_bytes().is_empty());
     }
 
     #[test]
