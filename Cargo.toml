@@ -5,17 +5,21 @@ edition = "2021"
 
 [dependencies]
 # For the actual serial communcation with the camera
-serialport = { version = "4.0.0" }
+serialport = "4.0.0"
 
 # For better error handling
-anyhow = { version = "1.0.0" }
+anyhow = "1.0.0"
 
 # For parsing CLI arguments
 clap = { version = "4.0.0", features = ["derive"] }
 # For parsing hex formatted CLI arguments
-clap-num = { version = "1.0.0" }
+clap-num = "1.0.0"
 
 # For easy debug loggs
-env_logger = { version = "0.11.0" }
-log = { version = "0.4.0" }
+env_logger = "0.11.0"
+log = "0.4.0"
+
+[dev-dependencies]
+# For mocking in unit tests
+mockall = "0.12.0"
 

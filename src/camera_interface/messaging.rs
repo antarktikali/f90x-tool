@@ -1,6 +1,10 @@
 use anyhow::{Result, anyhow};
 
 pub const OK_RESPONSE: &'static [u8] = &[0x06, 0x00];
+// "1020F90X/N90S[null][end of text][ack]"
+pub const EXPECTED_UNIT_INQUIRY_RESPONSE: &'static [u8; 16] = &[
+    0x31, 0x30, 0x32, 0x30, 0x46, 0x39, 0x30, 0x58, 0x2F, 0x4E, 0x39, 0x30, 0x53, 0x00, 0x03, 0x0
+];
 
 pub enum CameraCommand {
     Wakeup,
@@ -67,7 +71,7 @@ pub struct DataPacket {
 }
 
 impl DataPacket {
-    fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         let mut serialized: Vec<u8> = Vec::new();
 
         serialized.push(0x02); // "start" byte
