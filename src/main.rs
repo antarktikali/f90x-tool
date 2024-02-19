@@ -27,7 +27,7 @@ enum Commands {
         #[arg(default_value_t = 0)]
         memory_space: u8,
     },
-    /// [NOT IMPLEMENTED] Writes to the "0" memory space starting from the given address. Number of bytes to write
+    /// Writes to the "0" memory space starting from the given address. Number of bytes to write
     /// depends on the number of values given.
     Write {
         /// Serial device to use.
@@ -59,8 +59,8 @@ fn main() -> Result<()> {
         Commands::Read { serial_device, address, length, memory_space } => {
             cli_commands::read_memory_in_new_session(&serial_device, address, length, memory_space)
         }?,
-        Commands::Write { serial_device: _, address: _, write_values: _ } => {
-            todo!();
+        Commands::Write { serial_device, address, write_values } => {
+            cli_commands::write_memory_in_new_session(&serial_device, address, write_values)?
         },
         Commands::Focus { serial_device } => cli_commands::autofocus_in_new_session(&serial_device)?,
         Commands::Shoot { serial_device } => cli_commands::release_shutter_in_new_session(&serial_device)?,

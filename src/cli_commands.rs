@@ -14,6 +14,17 @@ pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: 
     return Ok(());
 }
 
+pub fn write_memory_in_new_session(serial_device: &String, address: u16, values: Vec<u8>) -> Result<()> {
+    let serial = SerialConnection::new(&serial_device)?;
+    let mut camera = CameraInterface::new(serial);
+    camera.start_new_session()?;
+    camera.send_command(&CameraCommand::WriteToMemory { address, values })?;
+    camera.expect_ok_response()?;
+    println!("Successfully written.");
+
+    return Ok(());
+}
+
 pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
     let mut camera = CameraInterface::new(serial);
