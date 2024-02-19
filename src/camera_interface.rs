@@ -1,4 +1,4 @@
-mod messaging;
+pub mod messaging;
 
 #[cfg(test)]
 use mockall::{automock, predicate::*, Sequence};
@@ -10,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 
 #[cfg_attr(test, automock)]
-trait SerialInterface {
+pub trait SerialInterface {
     /// Reads given number of bytes. Implementation is assumed to be blocking.
     fn read(&mut self, length: usize) -> Result<Vec<u8>, std::io::Error>;
     /// Writes the given data. Implementation is assumed to be blocking.
@@ -20,12 +20,12 @@ trait SerialInterface {
     fn clear_input(&mut self) -> Result<Vec<u8>, std::io::Error>;
 }
 
-struct SerialConnection<T: serialport::SerialPort> {
+pub struct SerialConnection<T: serialport::SerialPort> {
     serial: T
 }
 
 impl SerialConnection<serialport::TTYPort> {
-    fn new(serial_device: &String) -> Result<SerialConnection<serialport::TTYPort>, std::io::Error> {
+    pub fn new(serial_device: &String) -> Result<SerialConnection<serialport::TTYPort>, std::io::Error> {
         let default_baud_rate = 1200;
         let default_serial_timeout = 2000;
 
@@ -64,17 +64,21 @@ impl<T: serialport::SerialPort> SerialInterface for SerialConnection<T> {
     }
 }
 
-struct CameraInterface<T: SerialInterface> {
+pub struct CameraInterface<T: SerialInterface> {
     serial: T
 }
 
 impl<T: SerialInterface> CameraInterface<T> {
-    fn send_command(&mut self, command: &CameraCommand) -> Result<(), std::io::Error> {
+    pub fn new(serial: T) -> CameraInterface<T> {
+        return CameraInterface { serial };
+    }
+
+    pub fn send_command(&mut self, command: &CameraCommand) -> Result<(), std::io::Error> {
         debug!("Will send camera command: {:?}", command);
         self.serial.write(&command.get_bytes())
     }
 
-    fn expect_ok_response(&mut self) -> Result<(), std::io::Error> {
+    pub fn expect_ok_response(&mut self) -> Result<(), std::io::Error> {
         let response = self.serial.read(messaging::OK_RESPONSE.len())?;
         if response != messaging::OK_RESPONSE {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, ""));
@@ -82,7 +86,7 @@ impl<T: SerialInterface> CameraInterface<T> {
         return Ok(());
     }
 
-    fn start_new_session(&mut self) -> Result<(), std::io::Error> {
+    pub fn start_new_session(&mut self) -> Result<(), std::io::Error> {
         self.send_command(&CameraCommand::Wakeup)?;
         thread::sleep(Duration::from_millis(200));
         // If the camera was already awake, we might get some bytes. We don't really care about them.
@@ -96,7 +100,7 @@ impl<T: SerialInterface> CameraInterface<T> {
         return Ok(());
     }
 
-    fn expect_data_packet(&mut self, payload_length: u8) -> Result<messaging::DataPacket, std::io::Error> {
+    pub fn expect_data_packet(&mut self, payload_length: u8) -> Result<messaging::DataPacket, std::io::Error> {
         // Start byte(1) + payload + checksum(1) + stop byte(1)
         let expected_length: usize = (payload_length as usize) + 3;
 
@@ -109,37 +113,6 @@ impl<T: SerialInterface> CameraInterface<T> {
         }
     }
 
-}
-
-pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: u8, memory_space: u8) -> Result<()> {
-    let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface { serial };
-    camera.start_new_session()?;
-    camera.send_command(&CameraCommand::ReadMemory { memory_space, address, length })?;
-    let data_packet = camera.expect_data_packet(length)?;
-    println!("Memory value: {:02X?}", &data_packet.bytes);
-
-    return Ok(());
-}
-
-pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
-    let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface { serial };
-    camera.start_new_session()?;
-    camera.send_command(&CameraCommand::Focus)?;
-    camera.expect_ok_response()?;
-
-    return Ok(());
-}
-
-pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
-    let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface { serial };
-    camera.start_new_session()?;
-    camera.send_command(&CameraCommand::Shoot)?;
-    camera.expect_ok_response()?;
-
-    return Ok(());
 }
 
 #[cfg(test)]

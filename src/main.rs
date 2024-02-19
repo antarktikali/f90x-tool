@@ -1,4 +1,5 @@
 mod camera_interface;
+mod cli_commands;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -56,13 +57,13 @@ fn main() -> Result<()> {
 
     match arguments.command {
         Commands::Read { serial_device, address, length, memory_space } => {
-            camera_interface::read_memory_in_new_session(&serial_device, address, length, memory_space)
+            cli_commands::read_memory_in_new_session(&serial_device, address, length, memory_space)
         }?,
         Commands::Write { serial_device: _, address: _, write_values: _ } => {
             todo!();
         },
-        Commands::Focus { serial_device } => camera_interface::autofocus_in_new_session(&serial_device)?,
-        Commands::Shoot { serial_device } => camera_interface::release_shutter_in_new_session(&serial_device)?,
+        Commands::Focus { serial_device } => cli_commands::autofocus_in_new_session(&serial_device)?,
+        Commands::Shoot { serial_device } => cli_commands::release_shutter_in_new_session(&serial_device)?,
     };
 
     return Ok(());
