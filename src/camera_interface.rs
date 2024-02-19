@@ -5,7 +5,7 @@ use mockall::{automock, predicate::*, Sequence};
 
 use anyhow::Result;
 use messaging::CameraCommand;
-use log::debug;
+use log::{warn, debug};
 use std::thread;
 use std::time::Duration;
 
@@ -46,6 +46,9 @@ impl<T: serialport::SerialPort> SerialInterface for SerialConnection<T> {
     }
 
     fn write(&mut self, data: &Vec<u8>) -> Result<(), std::io::Error> {
+        if data.is_empty() {
+            warn!("Received no bytes to write");
+        }
         debug!("Sending bytes: {:02X?}", &data);
         self.serial.write(&data.as_slice())?;
         return Ok(());

@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use log::error;
 
 pub const OK_RESPONSE: &'static [u8] = &[0x06, 0x00];
 // "1020F90X/N90S[null][end of text][ack]"
@@ -51,6 +52,7 @@ impl CameraCommand {
 
     fn build_write_to_memory_command(address: u16, values: &Vec<u8>) -> Vec<u8> {
         if values.len() > (u8::MAX as usize) {
+            error!("Too many values ({}) given for the write command. Returning empty bytes.", values.len());
             return Vec::new();
         }
         let data_packet = DataPacket { bytes: values.clone() };

@@ -1,7 +1,7 @@
 use crate::camera_interface::{CameraInterface, SerialConnection};
 use crate::camera_interface::messaging::CameraCommand;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: u8, memory_space: u8) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
@@ -15,6 +15,9 @@ pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: 
 }
 
 pub fn write_memory_in_new_session(serial_device: &String, address: u16, values: Vec<u8>) -> Result<()> {
+    if values.len() > (u8::MAX as usize) {
+        return Err(anyhow!("Too many values given."));
+    }
     let serial = SerialConnection::new(&serial_device)?;
     let mut camera = CameraInterface::new(serial);
     camera.start_new_session()?;

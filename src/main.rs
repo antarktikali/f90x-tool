@@ -35,7 +35,8 @@ enum Commands {
         /// Starting address to write to. Prefix with 0x for hex value.
         #[clap(value_parser=clap_num::maybe_hex::<u16>)]
         address: u16,
-        /// Byte values to write. Separate by space for multiple bytes. Prefix each with 0x for hex value.
+        /// Byte values to write. Separate by space for multiple bytes. Prefix each with 0x for hex
+        /// value. Maximum number of bytes to be written in one go is 255.
         #[clap(value_parser=clap_num::maybe_hex::<u8>)]
         write_values: Vec<u8>,
     },
