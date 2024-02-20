@@ -11,5 +11,5 @@ The tool currently supports the following functions:
 
 There is a separate repository for the documentation of the serial interface:
 
-antarktikali/f90x-serial-documentation
+[antarktikali/f90x-serial-documentation]
 
