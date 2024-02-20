@@ -9,7 +9,6 @@ The tool currently supports the following functions:
 - Reading from memory
 - Writing to memory
 
-There is a separate repository for the documentation of the serial interface:
-
-[antarktikali/f90x-serial-documentation]
+There is a separate repository for the documentation of the serial interface
+[here](https://github.com/antarktikali/f90x-serial-documentation).
 
