@@ -49,6 +49,11 @@ enum Commands {
     Shoot {
         /// Serial device to use.
         serial_device: String,
+    },
+    /// Read memory holder info.
+    ReadMemoInfo {
+        /// Serial device to use.
+        serial_device: String,
     }
 }
 
@@ -65,6 +70,7 @@ fn main() -> Result<()> {
         },
         Commands::Focus { serial_device } => cli_commands::autofocus_in_new_session(&serial_device)?,
         Commands::Shoot { serial_device } => cli_commands::release_shutter_in_new_session(&serial_device)?,
+        Commands::ReadMemoInfo { serial_device } => cli_commands::read_and_print_memo_holder_info_in_new_session(&serial_device)?,
     };
 
     return Ok(());

@@ -48,3 +48,18 @@ pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
     return Ok(());
 }
 
+pub fn read_and_print_memo_holder_info_in_new_session(serial_device: &String) -> Result<()> {
+    let serial = SerialConnection::new(&serial_device)?;
+    let mut camera = CameraInterface::new(serial);
+    camera.start_new_session()?;
+    camera.send_command(&CameraCommand::ReadMemoHolderInfo)?;
+    let data_packet = camera.expect_data_packet(4)?;
+    // TODO
+    // Parse the response.
+    // First 2 bytes are the roll number, byte-coded decimal.
+    // Then comes the number of bytes in the current roll.
+    println!("Received bytes: {:02X?}", &data_packet.bytes);
+
+    return Ok(());
+}
+
