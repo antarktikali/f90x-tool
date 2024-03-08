@@ -103,7 +103,8 @@ impl DataPacket {
 
         let expected_checksum = DataPacket::calculate_checksum(payload_bytes);
         if expected_checksum != data[checksum_index] {
-            return Err(anyhow!["Received wrong checksum."]);
+            return Err(anyhow!["Received wrong checksum. Expected: {:02X?}, Received: {:02X?}",
+                               expected_checksum, data[checksum_index]]);
         }
 
         return Ok(DataPacket {
@@ -115,9 +116,11 @@ impl DataPacket {
         let mut checksum: u16 = 0;
         for &byte in data {
             checksum += byte as u16;
-            checksum %= 0xFF;
+            if 0x100 <= checksum {
+                checksum -= 0x100;
+            }
         }
-        return (checksum % 0xFF) as u8;
+        return (checksum & 0xFF) as u8;
     }
 }
 
@@ -166,7 +169,7 @@ mod tests {
             0x02, // length
             0x02, // "start"
             0xFA, 0x10, // payload
-            0x0B, // checksum
+            0x0A, // checksum
             0x03 // "stop"
         ];
         assert_eq!(expected, cmd.get_bytes());
@@ -241,23 +244,24 @@ mod tests {
     fn data_packet_should_be_deserialized_correctly() {
         let expected_payload: Vec<u8> = vec![0x04, 0x03];
         let packet: Vec<u8> = vec![0x02, 0x04, 0x03, 0x07, 0x03];
-        let result = DataPacket::deserialize(&packet);
-        match result {
-            Ok(deserialized) => { assert_eq!(&expected_payload, &deserialized.bytes); },
-            Err(_) => assert!(false),
-        }
+        let result = DataPacket::deserialize(&packet).unwrap();
+        assert_eq!(&expected_payload, &result.bytes);
     }
 
     #[test]
     fn data_packet_with_large_checksum_should_be_deserialized_correctly() {
-        let expected_payload: Vec<u8> = vec![0xFA, 0x0A, 0x04];
-        // 250 + 10 + 4: 264 -> 9
-        let packet: Vec<u8> = vec![0x02, 0xFA, 0x0A, 0x04, 0x09, 0x03];
-        let result = DataPacket::deserialize(&packet);
-        match result {
-            Ok(deserialized) => { assert_eq!(&expected_payload, &deserialized.bytes); },
-            Err(_) => assert!(false),
-        }
+        let expected_payload: Vec<u8> = vec![0x68, 0x22, 0x8D, 0x11];
+        let packet: Vec<u8> = vec![0x02, 0x68, 0x22, 0x8D, 0x11, 0x28, 0x03];
+        let result = DataPacket::deserialize(&packet).unwrap();
+        assert_eq!(&expected_payload, &result.bytes);
+    }
+
+    #[test]
+    fn large_data_packet_with_very_large_checksum_should_be_deserialized_correctly() {
+        let expected_payload: Vec<u8> = vec![0x33, 0x00, 0x28, 0x24, 0xC0, 0x4C, 0x00, 0x00, 0x29, 0x24, 0xC0, 0x4C, 0x00, 0x00, 0xFF, 0x08, 0x58, 0x5A, 0xC0, 0x4C, 0x00, 0x00, 0x34, 0x00, 0x2C, 0x16, 0xC0, 0x3C, 0x00, 0x00, 0x2C, 0x16];
+        let packet: Vec<u8> = vec![0x02, 0x33, 0x00, 0x28, 0x24, 0xC0, 0x4C, 0x00, 0x00, 0x29, 0x24, 0xC0, 0x4C, 0x00, 0x00, 0xFF, 0x08, 0x58, 0x5A, 0xC0, 0x4C, 0x00, 0x00, 0x34, 0x00, 0x2C, 0x16, 0xC0, 0x3C, 0x00, 0x00, 0x2C, 0x16, 0x5D, 0x03];
+        let result = DataPacket::deserialize(&packet).unwrap();
+        assert_eq!(&expected_payload, &result.bytes);
     }
 
     #[test]
