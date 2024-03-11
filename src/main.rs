@@ -26,6 +26,9 @@ enum Commands {
         /// Memory space to read from.
         #[arg(default_value_t = 0)]
         memory_space: u8,
+        /// Use a 9600 BAUD rate connection instead of the default 1200.
+        #[clap(short, long, action=clap::ArgAction::SetTrue)]
+        fast: bool,
     },
     /// Writes to the "0" memory space starting from the given address. Number of bytes to write
     /// depends on the number of values given.
@@ -39,6 +42,9 @@ enum Commands {
         /// value. Maximum number of bytes to be written in one go is 255.
         #[clap(value_parser=clap_num::maybe_hex::<u8>)]
         write_values: Vec<u8>,
+        /// Use a 9600 BAUD rate connection instead of the default 1200.
+        #[clap(short, long, action=clap::ArgAction::SetTrue)]
+        fast: bool,
     },
     /// Triggers auto-focus.
     Focus {
@@ -62,11 +68,11 @@ fn main() -> Result<()> {
     let arguments = Arguments::parse();
 
     match arguments.command {
-        Commands::Read { serial_device, address, length, memory_space } => {
-            cli_commands::read_memory_in_new_session(&serial_device, address, length, memory_space)
+        Commands::Read { serial_device, address, length, memory_space, fast } => {
+            cli_commands::read_memory_in_new_session(&serial_device, address, length, memory_space, fast)
         }?,
-        Commands::Write { serial_device, address, write_values } => {
-            cli_commands::write_memory_in_new_session(&serial_device, address, write_values)?
+        Commands::Write { serial_device, address, write_values, fast } => {
+            cli_commands::write_memory_in_new_session(&serial_device, address, write_values, fast)?
         },
         Commands::Focus { serial_device } => cli_commands::autofocus_in_new_session(&serial_device)?,
         Commands::Shoot { serial_device } => cli_commands::release_shutter_in_new_session(&serial_device)?,

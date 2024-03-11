@@ -9,6 +9,8 @@ use log::{warn, debug};
 use std::thread;
 use std::time::Duration;
 
+const DEFAULT_BAUD_RATE: u32 = 1200;
+
 #[cfg_attr(test, automock)]
 pub trait SerialInterface {
     /// Reads given number of bytes. Implementation is assumed to be blocking.
@@ -18,6 +20,8 @@ pub trait SerialInterface {
     /// Clears the available data in the input buffer by reading all the available bytes. The bytes
     /// that were cleared are returned for debugging purposes.
     fn clear_input(&mut self) -> Result<Vec<u8>, std::io::Error>;
+    /// Sets the BAUD rate of the serial interface.
+    fn set_baud_rate(&mut self, baud_rate: u32) -> Result<(), std::io::Error>;
 }
 
 pub struct SerialConnection<T: serialport::SerialPort> {
@@ -26,10 +30,9 @@ pub struct SerialConnection<T: serialport::SerialPort> {
 
 impl SerialConnection<serialport::TTYPort> {
     pub fn new(serial_device: &String) -> Result<SerialConnection<serialport::TTYPort>, std::io::Error> {
-        let default_baud_rate = 1200;
         let default_serial_timeout = 2000;
 
-        let serial_port = serialport::new(serial_device, default_baud_rate)
+        let serial_port = serialport::new(serial_device, DEFAULT_BAUD_RATE)
                 .timeout(Duration::from_millis(default_serial_timeout))
                 .open_native()?;
 
@@ -64,6 +67,12 @@ impl<T: serialport::SerialPort> SerialInterface for SerialConnection<T> {
         debug!("Clearing input buffer");
         self.serial.clear(serialport::ClearBuffer::Input)?;
         return Ok(read_buffer);
+    }
+
+    fn set_baud_rate(&mut self, baud_rate: u32) -> Result<(), std::io::Error> {
+        debug!("Setting BAUD rate to {}", baud_rate);
+        self.serial.set_baud_rate(baud_rate)?;
+        return Ok(());
     }
 }
 
@@ -100,6 +109,30 @@ impl<T: SerialInterface> CameraInterface<T> {
         if response != messaging::EXPECTED_UNIT_INQUIRY_RESPONSE.to_vec() {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, ""));
         }
+        return Ok(());
+    }
+
+    pub fn upgrade_to_fast_session(&mut self) -> Result<(), std::io::Error> {
+        self.send_command(&CameraCommand::IncreaseBaudRate)?;
+        self.expect_ok_response()?;
+
+        thread::sleep(Duration::from_millis(200));
+        self.serial.set_baud_rate(9600)?;
+        return Ok(());
+    }
+
+    pub fn end_fast_session(&mut self) -> Result<(), std::io::Error> {
+        debug!("Ending 9600 BAUD session");
+        let end_transmission_message: Vec<u8> = vec![0x04, 0x04];
+        self.serial.write(&end_transmission_message)?;
+
+        let response = self.serial.read(end_transmission_message.len())?;
+        if response != end_transmission_message {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, ""));
+        }
+
+        thread::sleep(Duration::from_millis(200));
+        self.serial.set_baud_rate(DEFAULT_BAUD_RATE)?;
         return Ok(());
     }
 
@@ -333,6 +366,94 @@ mod tests {
         let mut camera_interface = CameraInterface {serial: mock_serial};
 
         assert!(camera_interface.expect_data_packet(1).is_err());
+    }
+
+    #[test]
+    /// An existing session is upgraded to 9600 baud session by sending a special command, and
+    /// waiting 200ms before continuing with 9600 baud.
+    fn upgrade_to_fast_session_should_send_correct_messages() {
+        let mut sequence = Sequence::new();
+        let mut mock_serial = MockSerialInterface::new();
+        mock_serial.expect_write()
+                   .with(eq(CameraCommand::IncreaseBaudRate.get_bytes()))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+        mock_serial.expect_read()
+                   .with(eq(2))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(messaging::OK_RESPONSE.to_vec()));
+        mock_serial.expect_set_baud_rate()
+                   .with(eq(9600))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+
+        let mut camera_interface = CameraInterface {serial: mock_serial};
+        assert!(camera_interface.upgrade_to_fast_session().is_ok());
+    }
+
+    #[test]
+    fn upgrade_to_fast_session_should_fail_if_ok_response_is_not_received() {
+        let mut sequence = Sequence::new();
+        let mut mock_serial = MockSerialInterface::new();
+        mock_serial.expect_write()
+                   .with(eq(CameraCommand::IncreaseBaudRate.get_bytes()))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+        mock_serial.expect_read()
+                   .with(eq(2))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(vec![0x10u8, 0x20u8]));
+
+        let mut camera_interface = CameraInterface {serial: mock_serial};
+        assert!(camera_interface.upgrade_to_fast_session().is_err());
+    }
+
+    #[test]
+    fn end_fast_session_should_send_correct_messages() {
+        let mut sequence = Sequence::new();
+        let mut mock_serial = MockSerialInterface::new();
+        mock_serial.expect_write()
+                   .with(eq(vec![0x04u8, 0x04u8]))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+        mock_serial.expect_read()
+                   .with(eq(2))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(vec![0x04u8, 0x04u8]));
+        mock_serial.expect_set_baud_rate()
+                   .with(eq(1200))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+
+        let mut camera_interface = CameraInterface {serial: mock_serial};
+        assert!(camera_interface.end_fast_session().is_ok());
+    }
+
+    #[test]
+    fn end_fast_session_should_fail_if_eot_message_is_not_received() {
+        let mut sequence = Sequence::new();
+        let mut mock_serial = MockSerialInterface::new();
+        mock_serial.expect_write()
+                   .with(eq(vec![0x04u8, 0x04u8]))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(()));
+        mock_serial.expect_read()
+                   .with(eq(2))
+                   .times(1)
+                   .in_sequence(&mut sequence)
+                   .returning(|_| Ok(vec![0x01u8, 0x01u8]));
+
+        let mut camera_interface = CameraInterface {serial: mock_serial};
+        assert!(camera_interface.end_fast_session().is_err());
     }
 
 }

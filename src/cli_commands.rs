@@ -3,27 +3,52 @@ use crate::camera_interface::messaging::CameraCommand;
 
 use anyhow::{Result, anyhow};
 
-pub fn read_memory_in_new_session(serial_device: &String, address: u16, length: u8, memory_space: u8) -> Result<()> {
+pub fn read_memory_in_new_session(
+        serial_device: &String,
+        address: u16,
+        length: u8,
+        memory_space: u8,
+        use_fast_session: bool) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
     let mut camera = CameraInterface::new(serial);
     camera.start_new_session()?;
+    if use_fast_session {
+        camera.upgrade_to_fast_session()?;
+    }
+
     camera.send_command(&CameraCommand::ReadMemory { memory_space, address, length })?;
     let data_packet = camera.expect_data_packet(length)?;
     println!("Memory value: {:02X?}", &data_packet.bytes);
 
+    if use_fast_session {
+        camera.end_fast_session()?;
+    }
+
     return Ok(());
 }
 
-pub fn write_memory_in_new_session(serial_device: &String, address: u16, values: Vec<u8>) -> Result<()> {
+pub fn write_memory_in_new_session(
+        serial_device: &String,
+        address: u16,
+        values: Vec<u8>,
+        use_fast_session: bool) -> Result<()> {
     if values.len() > (u8::MAX as usize) {
         return Err(anyhow!("Too many values given."));
     }
     let serial = SerialConnection::new(&serial_device)?;
     let mut camera = CameraInterface::new(serial);
     camera.start_new_session()?;
+    if use_fast_session {
+        camera.upgrade_to_fast_session()?;
+    }
+
     camera.send_command(&CameraCommand::WriteToMemory { address, values })?;
     camera.expect_ok_response()?;
     println!("Successfully written.");
+
+    if use_fast_session {
+        camera.end_fast_session()?;
+    }
 
     return Ok(());
 }

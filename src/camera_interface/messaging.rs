@@ -13,6 +13,7 @@ pub enum CameraCommand {
     UnitInquiry,
     Focus,
     Shoot,
+    IncreaseBaudRate,
     ReadMemoHolderInfo,
     ReadMemory {
         memory_space: u8,
@@ -32,6 +33,7 @@ impl CameraCommand {
             CameraCommand::UnitInquiry => vec![0x53, 0x31, 0x30, 0x30, 0x30, 0x05],
             CameraCommand::Focus => vec![0x01, 0x20, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::Shoot => vec![0x01, 0x20, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03],
+            CameraCommand::IncreaseBaudRate => vec![0x01, 0x20, 0x87, 0x05, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::ReadMemoHolderInfo => vec![0x01, 0x20, 0x1B, 0x92, 0x00, 0x00, 0x00, 0x00, 0x03],
             CameraCommand::ReadMemory { memory_space, address, length } => {
                 CameraCommand::build_read_memory_command(*memory_space, *address, *length)
@@ -213,6 +215,13 @@ mod tests {
     fn test_camera_read_memo_holder_info_command() {
         let cmd = CameraCommand::ReadMemoHolderInfo;
         let expected: Vec<u8> = vec![0x01, 0x20, 0x1B, 0x92, 0x00, 0x00, 0x00, 0x00, 0x03];
+        assert_eq!(expected, cmd.get_bytes());
+    }
+
+    #[test]
+    fn test_camera_increase_baud_rate_command() {
+        let cmd = CameraCommand::IncreaseBaudRate;
+        let expected: Vec<u8> = vec![0x01, 0x20, 0x87, 0x05, 0x00, 0x00, 0x00, 0x00, 0x03];
         assert_eq!(expected, cmd.get_bytes());
     }
 
