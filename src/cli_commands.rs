@@ -1,4 +1,4 @@
-use crate::camera_interface::{CameraInterface, SerialConnection};
+use crate::camera_interface::{SerialCameraConnection, CameraInterface, SerialConnection};
 use crate::camera_interface::messaging::CameraCommand;
 
 use anyhow::{Result, anyhow};
@@ -10,7 +10,7 @@ pub fn read_memory_in_new_session(
         memory_space: u8,
         use_fast_session: bool) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface::new(serial);
+    let mut camera = SerialCameraConnection::new(serial);
     camera.start_new_session()?;
     if use_fast_session {
         camera.upgrade_to_fast_session()?;
@@ -36,7 +36,7 @@ pub fn write_memory_in_new_session(
         return Err(anyhow!("Too many values given."));
     }
     let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface::new(serial);
+    let mut camera = SerialCameraConnection::new(serial);
     camera.start_new_session()?;
     if use_fast_session {
         camera.upgrade_to_fast_session()?;
@@ -55,7 +55,7 @@ pub fn write_memory_in_new_session(
 
 pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface::new(serial);
+    let mut camera = SerialCameraConnection::new(serial);
     camera.start_new_session()?;
     camera.send_command(&CameraCommand::Focus)?;
     camera.expect_ok_response()?;
@@ -65,7 +65,7 @@ pub fn autofocus_in_new_session(serial_device: &String) -> Result<()> {
 
 pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface::new(serial);
+    let mut camera = SerialCameraConnection::new(serial);
     camera.start_new_session()?;
     camera.send_command(&CameraCommand::Shoot)?;
     camera.expect_ok_response()?;
@@ -75,7 +75,7 @@ pub fn release_shutter_in_new_session(serial_device: &String) -> Result<()> {
 
 pub fn read_and_print_memo_holder_info_in_new_session(serial_device: &String) -> Result<()> {
     let serial = SerialConnection::new(&serial_device)?;
-    let mut camera = CameraInterface::new(serial);
+    let mut camera = SerialCameraConnection::new(serial);
     camera.start_new_session()?;
     camera.send_command(&CameraCommand::ReadMemoHolderInfo)?;
     let data_packet = camera.expect_data_packet(4)?;
