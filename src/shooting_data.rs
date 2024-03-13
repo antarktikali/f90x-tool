@@ -87,6 +87,10 @@ fn get_memo_holder_info<T: CameraInterface>(camera: &mut T) -> Result<MemoHolder
     return Ok(MemoHolderInfo { roll_id, bytes_to_read });
 }
 
+fn has_finished_roll_to_read(addresses: &MemoHolderAddresses) -> bool {
+    return addresses.current_roll_start > addresses.start;
+}
+
 /// Read little endian u16 from the given vector.
 ///
 /// Returns error if the vector doesn't have enough bytes after the given index.
@@ -307,6 +311,37 @@ mod tests {
         assert_eq!(result.roll_id, 1337);
         assert_eq!(result.bytes_to_read, 0xABCD);
     }
+
+    #[test]
+    fn when_missing_finished_roll_and_having_unfinished_roll_should_tell_correctly() {
+        let addresses = MemoHolderAddresses {
+                start: 0x13A6,
+                current_roll_start: 0x13A6,
+                current: 0x13BA
+        };
+        assert!(!has_finished_roll_to_read(&addresses));
+    }
+
+    #[test]
+    fn when_having_finished_roll_and_missing_unfinished_roll_should_tell_correctly() {
+        let addresses = MemoHolderAddresses {
+                start: 0x13A6,
+                current_roll_start: 0x13BC,
+                current: 0x13BC
+        };
+        assert!(has_finished_roll_to_read(&addresses));
+    }
+
+    #[test]
+    fn when_missing_finished_roll_and_missing_unfinished_roll_should_tell_correctly() {
+        let addresses = MemoHolderAddresses {
+                start: 0x01EA,
+                current_roll_start: 0x01EA,
+                current: 0x01EA
+        };
+        assert!(!has_finished_roll_to_read(&addresses));
+    }
+
 }
 
 
@@ -316,7 +351,7 @@ mod tests {
 // - Delete shooting data
 // - Read unfinished shooting data
 // Internally needed things:
-// - Check if there is data, read 0xFD42 (6 bytes)
+// + Check if there is data, read 0xFD42 (6 bytes)
 // + Get ring buffer start and end address (0xFD00)
 // + Get shooting data settings (0xFD40)
 // + Get data pointers (0xFD42)
