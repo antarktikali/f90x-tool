@@ -1,5 +1,6 @@
 mod camera_interface;
 mod cli_commands;
+mod shooting_data;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
